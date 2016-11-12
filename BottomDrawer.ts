@@ -1,5 +1,4 @@
-﻿/// <reference path="../../../Scripts/typings/jqueryui/jqueryui.d.ts" />
-class BottomDrawerSettings {
+﻿class BottomDrawerSettings {
     public snap = true;
     public open = ko.observable(false);
     public percentage = ko.observable<number>(0);

@@ -1,5 +1,4 @@
 var _this = this;
-/// <reference path="../../../Scripts/typings/jqueryui/jqueryui.d.ts" />
 var BottomDrawerSettings = (function () {
     function BottomDrawerSettings() {
         this.snap = true;
