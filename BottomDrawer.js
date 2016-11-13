@@ -1,58 +1,124 @@
-var _this = this;
 var BottomDrawerSettings = (function () {
     function BottomDrawerSettings() {
-        this.snap = true;
-        this.open = ko.observable(false);
-        this.percentage = ko.observable(0);
     }
     return BottomDrawerSettings;
 }());
-ko.bindingHandlers['BottomDrawer'] = {
-    init: function (element, valueAccessor) {
-        _this.toggle = function (jqElement, open) {
-            var windowHeight = $("#body").height();
-            if (open) {
-                jqElement.animate({ top: windowHeight - 45 + "px" }, 150);
-                jqElement.children(".bottomDrawerContent").animate({ height: 0 }, 150);
-            }
-            else {
-                jqElement.animate({ top: "0px" }, 150);
-                jqElement.children(".bottomDrawerContent").height(windowHeight - 45 + "px");
-            }
+/**
+ * A binding for a slider coming up from the bottom of the screen. It is optimized
+ * for small mobile screens.
+ *
+ * @requires jQuery, jQuery Draggable, KnockoutJs
+ *
+ * Functionality (under development)
+ * - beforeAdd
+ * - afterRemove
+ * - snap open or closed
+ * - tap
+ */
+ko.bindingHandlers["BottomDrawer"] = {
+    init: function (element, valueAccessor, allBindings) {
+        var settings = valueAccessor();
+        // click handler
+        if (settings.animate == undefined) {
+            settings.animate = true;
+        }
+        var toggleFunction = function (percentage) {
+            setTimeout(function () {
+                var jqElement = $(element);
+                var topPercentage = 100 - percentage;
+                var parentHeight = element.parentNode.clientHeight;
+                var headerHeight = jqElement.children(".header").height();
+                var headerPercentage = headerHeight / parentHeight * 100;
+                var contentHeight = (parentHeight * percentage / 100) - headerHeight;
+                if (contentHeight < 0) {
+                    contentHeight = 0;
+                }
+                if (topPercentage + headerPercentage > 100) {
+                    topPercentage = topPercentage - headerPercentage;
+                }
+                var timing = 0;
+                if (ko.unwrap(settings.animate)) {
+                    timing = 150;
+                }
+                jqElement.animate({ top: topPercentage + "%" }, timing);
+                jqElement.children(".content").animate({ height: contentHeight + "px" }, 150);
+                jqElement.animate({ height: headerHeight + contentHeight + "px" }, 0);
+                settings.percentage(percentage);
+                if (ko.unwrap(settings.snap)) {
+                    if (percentage === 0 && settings.onClose) {
+                        settings.onClose();
+                    }
+                    if (percentage === 100 && settings.onOpen) {
+                        settings.onOpen();
+                    }
+                }
+            }, 0);
         };
-        var value = valueAccessor();
+        // click handler
+        if (settings.openOnTap == undefined) {
+            settings.openOnTap = true;
+        }
+        if (settings.percentage == undefined) {
+            settings.percentage = ko.observable(0);
+        }
+        if (settings.open !== undefined) {
+            settings.open.subscribe(function (newValue) {
+                if (newValue) {
+                    toggleFunction(100);
+                }
+                else {
+                    toggleFunction(0);
+                }
+            });
+        }
+        toggleFunction(settings.percentage());
+        if (ko.unwrap(settings.openOnTap)) {
+            ko.utils.registerEventHandler($(element).children(".header"), "click", function () {
+                var percentage = ko.unwrap(settings.percentage);
+                var newPercentage = percentage > 50 ? 0 : 100;
+                toggleFunction(newPercentage);
+            });
+        }
+        // drag handler
         var jqElement = $(element);
         jqElement.draggable({
-            handle: ".filterHeader",
+            handle: ".header",
             snapMode: "inner",
-            containment: [0, 45, 0, "100%"],
+            containment: [0, jqElement.children(".header").height(), 0, "100%"],
             axis: "y",
-            drag: function (event) {
-                jqElement.css("height", "");
-                jqElement.css("bottom", "0");
-                var height = $(".filterView").height();
-                jqElement.children(".bottomDrawerContent").height(height + "px");
+            drag: function (event, ui) {
+                var dragPostionFromTop = ui.position.top;
+                var parent = jqElement.parent();
+                var parentHeight = parent.height();
+                var headerHeight = jqElement.children(".header").height();
+                var contentHeight = parentHeight - dragPostionFromTop;
+                if (contentHeight < 0) {
+                    contentHeight = 0;
+                }
+                settings.percentage(100 - (dragPostionFromTop / parentHeight * 100));
+                jqElement.animate({ height: headerHeight + contentHeight + "px" }, 0);
+                jqElement.children(".content").animate({ height: contentHeight + "px" }, 0);
+                jqElement.children(".content").animate({ top: headerHeight + "px" }, 0);
             },
             stop: function (event, ui) {
                 var position = ui.position.top;
                 var windowHeight = $("#body").height();
-                var openNow = FilterObject.filterOpen();
-                var newValue = false;
-                if (value.snap) {
-                    if (position < windowHeight / 2) {
-                        newValue = true;
+                var realPosition = windowHeight - position;
+                if (ko.unwrap(settings.snap)) {
+                    if (realPosition < windowHeight / 2) {
+                        toggleFunction(0);
+                    }
+                    else {
+                        toggleFunction(100);
                     }
                 }
-                FilterObject.filterOpen(newValue);
-                _this.toggle(newValue);
+                else {
+                    toggleFunction(realPosition / windowHeight * 100);
+                }
             }
         });
-    },
-    update: function (element, valueAccessor) {
-        debugger;
-        var jqElement = $(element);
-        var settings = ko.unwrap(valueAccessor());
-        var shouldBeOpen = settings.open();
-        _this.toggle(jqElement, shouldBeOpen);
+        if (settings.afterAdd) {
+            settings.afterAdd();
+        }
     }
 };
